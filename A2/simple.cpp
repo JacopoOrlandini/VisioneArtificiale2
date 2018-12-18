@@ -140,7 +140,8 @@ cv::applyColorMap(adjMap, falseColorsMap, cv::COLORMAP_RAINBOW);
 cv::namedWindow("response1", cv::WINDOW_NORMAL);
 cv::imshow("response1", falseColorsMap);
 
-//Discriminazione secondo soglia di Harris
+
+//Non-maximum suppression
 	for (int r = 1; r < theta.rows-1; r++) {
 		for (int c = 1; c < theta.cols-1; c++) {
 			if (theta.at<float>(r,c) > harrisTh) {
@@ -151,9 +152,9 @@ cv::imshow("response1", falseColorsMap);
 					theta.at<float>(r,c) > theta.at<float>(r,c+1) &&
 					theta.at<float>(r,c) > theta.at<float>(r+1,c-1) &&
 					theta.at<float>(r,c) > theta.at<float>(r+1,c) &&
-					theta.at<float>(r,c) > theta.at<float>(r,c+1)){
-					float val = 9;
-					keypoints0.push_back(cv::KeyPoint((float)c, (float)r , val));
+					theta.at<float>(r,c) > theta.at<float>(r+1,c+1)){
+					float diameter = 3 ;
+					keypoints0.push_back(cv::KeyPoint((float)c, (float)r, diameter));
 				}
 			}
 		}
@@ -166,22 +167,20 @@ void findHomographyRansac(const std::vector<cv::Point2f> & points1, const std::v
 {
 
 	float normEuclidea = 0;
+	int numBestInlier = 0;
 	std::vector<cv::Point2f> sample0(sample_size); //inliers
 	std::vector<cv::Point2f> sample1(sample_size); //inliers
-
-
 	srand ((unsigned) time(NULL));
 
-	int numBestInlier = 0;
-
-	for (int k = 0; k < N; k++) {
+	for (int k = 0; k < N; k++) 
+	{
 		int tmpNum = 0;
 		std::vector<cv::Point2f> v0;	//vettori di appoggio per inliers_best.
 		std::vector<cv::Point2f> v1;
 
 		for (int i = 0; i < sample_size; i++)
 		{
-			 int randomChoose = rand() % points0.size()-1;
+			 int randomChoose = rand() % points0.size();
 			 sample0[i] = points0[randomChoose];
 			 sample1[i] = points1[randomChoose];
 		}
@@ -199,25 +198,24 @@ void findHomographyRansac(const std::vector<cv::Point2f> & points1, const std::v
 			double omogZ = H.at<double>(2,0)*points1[j].x + H.at<double>(2,1)*points1[j].y + H.at<double>(2,2);
 			double euclX = omogX / omogZ;
 			double euclY = omogY / omogZ;
-			cv::Point2l omographPoint(euclX,euclY);
+			cv::Point2f omographPoint(euclX,euclY);
 
 			//Norma euclidea e discriminazione sull'errore
 			normEuclidea = sqrt(pow( (points0[j].x - omographPoint.x ) , 2) + pow( (points0[j].y - omographPoint.y ) , 2) );
-			if ( normEuclidea	< epsilon )
+			if ( normEuclidea < epsilon )
 			{
 				tmpNum++;
 				v0.push_back(points0[j]);
 				v1.push_back(points1[j]);
 			 }
-
-			 if (tmpNum >= numBestInlier)
-			 {
+			}
+			if (tmpNum >= numBestInlier)
+			{
 				numBestInlier = tmpNum;
 				inliers_best0.clear();
 			 	inliers_best0 = v0;
 				inliers_best1.clear();
 				inliers_best1 = v1;
-			 }
 			}
 		}
 	//Ottenuto il migliore set di keypoint che soddisfano la minimizzazione dell'errore calcolo l'omografia definitiva.
@@ -286,7 +284,7 @@ int main(int argc, char **argv)
 	//
 	float alpha = 0.05;
 
-	float harrisTh = 0.35;    //da impostare in base alla propria implementazione
+	float harrisTh = 0.37;    //da impostare in base alla propria implementazione
 
 	std::vector<cv::KeyPoint> keypoints0, keypoints1;
 
@@ -341,8 +339,8 @@ int main(int argc, char **argv)
 
 		if(points[1].size()>=4)
     {
-    	int N=100;            //numero di iterazioni di RANSAC
-    	float epsilon = 0.4;  //distanza per il calcolo degli inliers
+    	int N=200;            //numero di iterazioni di RANSAC
+    	float epsilon = 0.5;  //distanza per il calcolo degli inliers
     	int sample_size = 4;  //dimensione del sample
 
     	findHomographyRansac(points[1], points[0], N, epsilon, sample_size, H, inliers_best[0], inliers_best[1]);
